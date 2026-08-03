@@ -56,6 +56,13 @@ set_theme()
 def load_data():
     try:
         df = pd.read_csv('database.csv')
+    
+        df.columns = df.columns.str.strip().str.lower()
+    
+        if 'ingredient' not in df.columns:
+            st.error(f"❌ ไฟล์ CSV ผิดปกติ! ระบบอ่านหัวตารางได้เป็น: {list(df.columns)} กรุณาเช็กบรรทัดแรกของไฟล์ database.csv")
+            return pd.DataFrame()
+            
         df['ingredient'] = df['ingredient'].astype(str).str.lower().str.strip()
         return df
     except FileNotFoundError:
