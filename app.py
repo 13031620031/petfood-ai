@@ -12,67 +12,43 @@ import base64
 st.set_page_config(page_title="PetFood Safety AI", page_icon="🐶", layout="wide") 
 
 # ==========================================
-# 2. ฟังก์ชันแปลงรูปพื้นหลัง background.png ให้แสดงผลได้ 100%
+# 2. ตั้งค่าธีม (Pet-Friendly Theme)
 # ==========================================
-def set_bg_local(image_file):
-    try:
-        with open(image_file, "rb") as f:
-            encoded_string = base64.b64encode(f.read()).decode()
-        css = f"""
-        <style>
-        /* ตั้งค่าลายพื้นหลังสีชมพูลายเครื่องสำอาง */
-        .stApp {{
-            background-image: url("data:image/png;base64,{encoded_string}");
-            background-repeat: repeat;
-            background-size: 350px;
-        }}
-        
-        /* ทำกล่องเนื้อหาหลักทั้งหมดให้เป็น "สีขาวทึบ" เพื่อให้อ่านง่ายและไม่ลายตา */
-        .main .block-container {{
-            background-color: #FFFFFF !important;
-            border-radius: 20px;
-            padding: 2.5rem;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
-            margin-top: 2rem;
-            margin-bottom: 2rem;
-        }}
-        
-        /* ทำกล่องย่อย/Expander ภายในให้เป็นสีขาวทึบเช่นกัน */
-        div.stExpander, div.stAlert {{
-            background-color: #FFFFFF !important;
-            border-radius: 12px;
-        }}
+def set_theme():
+    css = """
+    <style>
+    /* พื้นหลังสีสว่างสบายตา */
+    .stApp {
+        background-color: #f4f6f9; 
+    }
+    
+    /* กล่องเนื้อหาหลัก */
+    .main .block-container {
+        background-color: #FFFFFF !important;
+        border-radius: 20px;
+        padding: 2.5rem;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        border-top: 8px solid #ff9f43; /* ขีดสีส้มด้านบนให้ดูเป็นแอปสัตว์เลี้ยง */
+        margin-top: 2rem;
+        margin-bottom: 2rem;
+    }
 
-        /* บังคับสีตัวหนังสือให้เป็นสีเข้มเข้มคมชัด อ่านง่ายสบายตา */
-        h1, h2, h3, h4, h5, h6, p, span, label, div {{
-            color: #2c3e50 !important;
-        }}
-        
-        /* ตกแต่งปุ่มกดสีชมพูพาสเทล */
-        .stButton>button {{
-            border-radius: 20px;
-            font-weight: bold;
-            border: none;
-            background-color: #ff9eaa;
-            color: white !important;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            transition: all 0.3s ease;
-        }}
-        
-        .stButton>button:hover {{
-            transform: translateY(-2px);
-            background-color: #ff7f90;
-            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
-        }}
-        </style>
-        """
-        st.markdown(css, unsafe_allow_html=True)
-    except FileNotFoundError:
-        pass
+    /* เปลี่ยนสีปุ่มเป็นสีส้ม */
+    .stButton>button {
+        border-radius: 20px;
+        font-weight: bold;
+        background-color: #ff9f43;
+        color: white !important;
+        border: none;
+    }
+    .stButton>button:hover {
+        background-color: #e67e22;
+    }
+    </style>
+    """
+    st.markdown(css, unsafe_allow_html=True)
 
-# เรียกใช้ฟังก์ชันใส่พื้นหลังด้วยไฟล์ background.png
-set_bg_local('background.png')
-
+set_theme()
 # ==========================================
 # 3. โหลดฐานข้อมูล
 # ==========================================
@@ -185,6 +161,29 @@ def analyze_ingredients_with_boxes(processed_img, df):
 # ==========================================
 # 5. หน้าจอหลัก (UI)
 # ==========================================
+
+# ==========================================
+# 5. หน้าจอหลัก (UI)
+# ==========================================
+col_icon, col_title = st.columns([1, 9])
+with col_icon:
+    st.image("woman_5362023.png", width=65) # เปลี่ยนไอคอนตรงนี้ถ้ามีรูปหมาแมว
+with col_title:
+    st.title("PetFood Safety AI")
+
+st.markdown("**ระบบสแกนและตรวจจับส่วนผสมอันตรายในอาหารสัตว์เลี้ยง**")
+st.markdown("---")
+
+# 🟢 เพิ่มฟีเจอร์ "ว้าว" ตรงนี้: ให้ผู้ใช้เลือกสิ่งที่สัตว์เลี้ยงแพ้
+st.markdown("### ⚠️ ตั้งค่าสุขภาพสัตว์เลี้ยง (AI Personalization)")
+user_allergies = st.multiselect(
+    "สัตว์เลี้ยงของคุณมีประวัติแพ้วัตถุดิบอะไรบ้าง? (ระบบจะแจ้งเตือนหากสแกนพบ)",
+    ["Chicken", "Beef", "Corn", "Wheat", "Soy", "Fish Meal", "Dairy"]
+)
+st.markdown("---")
+
+tab1, tab2 = st.tabs(["📸 ถ่ายรูปจากกล้อง", "📂 อัปโหลดรูปภาพ"])
+
 col_icon, col_title = st.columns([1, 9])
 with col_icon:
     # ถ้ามีรูปไอคอนสัตว์เลี้ยงให้เปลี่ยนชื่อไฟล์ตรงนี้ ถ้าไม่มีให้ comment บรรทัดนี้ทิ้งไปก่อน
