@@ -163,7 +163,7 @@ def analyze_ingredients_with_boxes(processed_img, df):
 # ==========================================
 col_icon, col_title = st.columns([1, 9])
 with col_icon:
-    st.image("woman_5362023.png", width=65) # สามารถเปลี่ยนชื่อไฟล์ตรงนี้เป็นรูปหมา/แมวได้
+    st.image("icon.png", width=65) 
 with col_title:
     st.title("PetFood Safety AI")
 
