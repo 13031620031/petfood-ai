@@ -4,7 +4,6 @@ from PIL import Image, ImageEnhance, ImageDraw
 import pytesseract
 import re
 import difflib
-import base64
 
 # ==========================================
 # 1. ตั้งค่าหน้าเพจ 
@@ -49,6 +48,7 @@ def set_theme():
     st.markdown(css, unsafe_allow_html=True)
 
 set_theme()
+
 # ==========================================
 # 3. โหลดฐานข้อมูล
 # ==========================================
@@ -95,7 +95,7 @@ def analyze_ingredients_with_boxes(processed_img, df):
         "tocopherol": ["vitamin e", "mixed-tocopherols", "mixed tocopherols"],
         "ascorbic acid": ["vitamin c", "l-ascorbyl-2-polyphosphate"],
         "meat by-product": ["meat by-products", "chicken by-product", "chicken by-products", "poultry by-product"],
-        "artificial color": ["added color", "color added", "yellow 5", "red 40", "yellow 6", "blue 2"] 
+        "artificial color": ["added color", "color added", "yellow 5", "red 40", "yellow 6", "blue 2", "yellow 6, blue 2"] 
     }
     
     for index, db_row in df.iterrows():
@@ -158,23 +158,20 @@ def analyze_ingredients_with_boxes(processed_img, df):
     else:
         return pd.DataFrame(), data
 
-# ==========================================
-# 5. หน้าจอหลัก (UI)
-# ==========================================
 
 # ==========================================
 # 5. หน้าจอหลัก (UI)
 # ==========================================
 col_icon, col_title = st.columns([1, 9])
 with col_icon:
-    st.image("woman_5362023.png", width=65) # เปลี่ยนไอคอนตรงนี้ถ้ามีรูปหมาแมว
+    st.image("woman_5362023.png", width=65) # สามารถเปลี่ยนชื่อไฟล์ตรงนี้เป็นรูปหมา/แมวได้
 with col_title:
     st.title("PetFood Safety AI")
 
-st.markdown("**ระบบสแกนและตรวจจับส่วนผสมอันตรายในอาหารสัตว์เลี้ยง**")
+st.markdown("**ระบบสแกนและตรวจจับส่วนผสมอันตรายในอาหารสัตว์เลี้ยง (พร้อมระบบคลิกไฮไลต์ตำแหน่งบนถุงอาหาร)**")
 st.markdown("---")
 
-# 🟢 เพิ่มฟีเจอร์ "ว้าว" ตรงนี้: ให้ผู้ใช้เลือกสิ่งที่สัตว์เลี้ยงแพ้
+# 🟢 ฟีเจอร์ "ว้าว": ให้ผู้ใช้เลือกสิ่งที่สัตว์เลี้ยงแพ้
 st.markdown("### ⚠️ ตั้งค่าสุขภาพสัตว์เลี้ยง (AI Personalization)")
 user_allergies = st.multiselect(
     "สัตว์เลี้ยงของคุณมีประวัติแพ้วัตถุดิบอะไรบ้าง? (ระบบจะแจ้งเตือนหากสแกนพบ)",
@@ -184,23 +181,12 @@ st.markdown("---")
 
 tab1, tab2 = st.tabs(["📸 ถ่ายรูปจากกล้อง", "📂 อัปโหลดรูปภาพ"])
 
-col_icon, col_title = st.columns([1, 9])
-with col_icon:
-    # ถ้ามีรูปไอคอนสัตว์เลี้ยงให้เปลี่ยนชื่อไฟล์ตรงนี้ ถ้าไม่มีให้ comment บรรทัดนี้ทิ้งไปก่อน
-    st.image("woman_5362023.png", width=65) 
-with col_title:
-    st.title("PetFood Safety AI")
-
-st.markdown("**ระบบสแกนและตรวจจับส่วนผสมอันตรายในอาหารสัตว์เลี้ยง (พร้อมระบบคลิกไฮไลต์ตำแหน่งบนถุงอาหาร)**")
-
-tab1, tab2 = st.tabs(["📸 ถ่ายรูปจากกล้อง", "📂 อัปโหลดรูปภาพ"])
-
 with tab1:
-    st.info("💡 **วิธีใช้งาน:** ถ่ายรูปสลากส่วนผสมให้ชัดเจน แล้วรอ AI ประมวลผล")
-    camera_file = st.camera_input("ถ่ายรูปสลากผลิตภัณฑ์")
+    st.info("💡 **วิธีใช้งาน:** ถ่ายรูปฉลากส่วนผสมให้ชัดเจน แล้วรอ AI ประมวลผล")
+    camera_file = st.camera_input("ถ่ายรูปฉลากผลิตภัณฑ์")
     
 with tab2:
-    st.info("💡 **วิธีใช้งาน:** อัปโหลดรูปภาพสลากผลิตภัณฑ์ แล้วรอ AI ประมวลผล")
+    st.info("💡 **วิธีใช้งาน:** อัปโหลดรูปภาพฉลากผลิตภัณฑ์ แล้วรอ AI ประมวลผล")
     uploaded_file = st.file_uploader("เลือกรูปภาพ...", type=['jpg', 'jpeg', 'png'])
 
 img_file = camera_file if camera_file is not None else uploaded_file
@@ -222,7 +208,18 @@ if img_file is not None:
     if result_df.empty:
         st.warning("สแกนพบภาพ แต่ไม่พบสารสำคัญที่ตรงกับฐานข้อมูล แนะนำให้ถ่ายรูปในมุมที่สว่างและชัดเจนขึ้น")
     else:
-        st.success(f"✅ ตรวจพบสารสำคัญที่รู้จัก {len(result_df)} ชนิด")
+        st.success(f"✅ ตรวจพบวัตถุดิบที่รู้จัก {len(result_df)} ชนิด")
+
+        # 🟢 เพิ่มระบบประมวลผลการแพ้อาหาร (Personalized Alert) ตรงนี้
+        allergy_alerts = []
+        for index, row in result_df.iterrows():
+            if row['Ingredient'] in user_allergies:
+                allergy_alerts.append(row['Ingredient'])
+        
+        if allergy_alerts:
+            st.error(f"🚨 **แจ้งเตือนอันตรายรุนแรง!** ตรวจพบส่วนผสมที่สัตว์เลี้ยงของคุณแพ้: **{', '.join(allergy_alerts)}**")
+        elif len(user_allergies) > 0:
+            st.success("✨ **ปลอดภัย!** ไม่พบส่วนผสมที่สัตว์เลี้ยงของคุณแพ้ในอาหารถุงนี้")
 
         st.markdown("### 🔍 คลิกเลือกสารเพื่อดูตำแหน่งไฮไลต์บนรูปภาพ")
         
@@ -248,7 +245,7 @@ if img_file is not None:
             )
             
             st.image(draw_image, caption=f"ตำแหน่งของสาร: {selected_ingredient}", use_container_width=True)
-            st.caption("🔴 กรอบสีแดงบนรูปภาพคือตำแหน่งที่ AI ตรวจพบสารตัวนี้ครับ")
+            st.caption("🔴 กรอบสีแดงบนรูปภาพคือตำแหน่งที่ AI ตรวจพบวัตถุดิบตัวนี้ครับ")
 
         with col_res:
             st.markdown("### 📋 ผลการวิเคราะห์แยกตามระดับความเสี่ยง")
