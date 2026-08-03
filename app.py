@@ -55,18 +55,16 @@ set_theme()
 @st.cache_data
 def load_data():
     try:
-        df = pd.read_csv('database.csv')
-    
-        df.columns = df.columns.str.strip().str.lower()
-    
-        if 'ingredient' not in df.columns:
-            st.error(f"❌ ไฟล์ CSV ผิดปกติ! ระบบอ่านหัวตารางได้เป็น: {list(df.columns)} กรุณาเช็กบรรทัดแรกของไฟล์ database.csv")
-            return pd.DataFrame()
-            
+        # ใช้ header=0 เพื่อข้ามหัวตารางเก่า และตั้งชื่อใหม่เข้าไปทับเลย
+        df = pd.read_csv('database.csv', header=0, names=['ingredient', 'function', 'risk_level'], usecols=[0, 1, 2])
+        
         df['ingredient'] = df['ingredient'].astype(str).str.lower().str.strip()
         return df
     except FileNotFoundError:
         st.error("❌ ไม่พบไฟล์ 'database.csv'")
+        return pd.DataFrame()
+    except Exception as e:
+        st.error(f"❌ เกิดข้อผิดพลาดในการอ่านฐานข้อมูล: {e}")
         return pd.DataFrame()
 
 df_db = load_data()
