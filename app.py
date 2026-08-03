@@ -89,79 +89,92 @@ def load_data():
 df_db = load_data()
 
 # ==========================================
-# 4. ฟังก์ชันวิเคราะห์ส่วนผสม (อัปเกรดความแม่นยำสูง - Sliding Window)
+# 4. ฟังก์ชันวิเคราะห์ส่วนผสม (ระดับ Pro - Spatial Mapping + Regex)
 # ==========================================
 def analyze_ingredients_with_boxes(processed_img, df):
     data = pytesseract.image_to_data(processed_img, output_type=pytesseract.Output.DATAFRAME)
-    # กรองเอาเฉพาะแถวที่มีข้อความ
-    data = data[data.text.notnull() & (data.text.str.strip() != "")].copy()
+    # กรองเอาเฉพาะแถวที่มีข้อความ และ Reset Index เพื่อให้ใช้อ้างอิงตำแหน่งได้แม่นยำ
+    data = data[data.text.notnull() & (data.text.str.strip() != "")].reset_index(drop=True)
     
     if data.empty:
         return pd.DataFrame(), data
         
-    # ลบเครื่องหมายวรรคตอนท้ายคำออก เช่น , . ( ) เพื่อให้จับคู่คำได้แม่นยำขึ้น
-    data['text_clean'] = data['text'].astype(str).str.lower().str.strip('.,;:!?()[]{}*"\'')
+    # -------------------------------------------------------------
+    # เทคนิคที่ 1: Character-to-Box Mapping (เชื่อมตัวอักษรเข้ากับพิกัด)
+    # -------------------------------------------------------------
+    full_text = ""
+    char_to_word_idx = [] # เก็บว่าตัวอักษรที่ i มาจาก DataFrame แถวไหน
     
-    found_ingredients = []
-    db_ingredients = df['ingredient'].tolist()
-    
-    from difflib import SequenceMatcher
-    def similar(a, b):
-        return SequenceMatcher(None, a, b).ratio()
+    for idx, row in data.iterrows():
+        word = str(row['text']).lower().strip()
+        # นำคำมาต่อกันด้วยช่องว่าง
+        full_text += word + " "
+        # จับคู่ตัวอักษรทุกตัว (รวมถึงช่องว่าง) ให้ชี้กลับไปที่พิกัด Index ของคำนั้น
+        char_to_word_idx.extend([idx] * (len(word) + 1))
         
-    # ระบบดักจับคำพ้องความหมาย (ถ้าในสลากเขียนแบบนึง แต่ใน DB เก็บอีกแบบ)
+    found_ingredients = []
+    
+    # ดิกชันนารีคำพ้องความหมาย (ทำเป็น List เพื่อให้รองรับชื่อสารได้หลายรูปแบบ)
     reverse_synonyms = {
         "tocopherol": ["vitamin e", "mixed-tocopherols", "mixed tocopherols"],
         "ascorbic acid": ["vitamin c", "l-ascorbyl-2-polyphosphate"],
         "meat by-product": ["meat by-products", "chicken by-product", "chicken by-products", "poultry by-product"],
-        "fish meal": ["menhaden fish meal"],
-        "artificial color": ["added color", "color added"]
+        "artificial color": ["added color", "color added", "yellow 5", "red 40", "yellow 6", "blue 2"] 
     }
     
-    for index, row in df.iterrows():
-        ing_name = str(row['ingredient']).strip().lower()
+    for index, db_row in df.iterrows():
+        ing_name = str(db_row['ingredient']).strip().lower()
         
-        # รวมคำค้นหาหลัก และคำพ้องความหมาย
         search_terms = [ing_name]
         if ing_name in reverse_synonyms:
             search_terms.extend(reverse_synonyms[ing_name])
             
-        best_match_ratio = 0
-        best_box = None
-        
         for term in search_terms:
-            term_words = term.split()
-            n_words = len(term_words)
+            # -------------------------------------------------------------
+            # เทคนิคที่ 2: Flexible Regex Matching (ค้นหาแบบยืดหยุ่น)
+            # -------------------------------------------------------------
+            # แปลงคำค้นหาให้ยืดหยุ่น เช่น "chicken meal" จะเจอทั้ง "chicken meal", "chicken-meal", "chicken, meal"
+            escaped_words = [re.escape(w) for w in term.split()]
+            pattern = r'[\s\W]*'.join(escaped_words) 
             
-            # ใช้เทคนิค Sliding Window (เลื่อนหน้าต่างอ่านทีละกลุ่มคำ)
-            for i in range(len(data) - n_words + 1):
-                window_df = data.iloc[i : i + n_words]
-                # นำคำในหน้าต่างมาต่อกัน
-                window_text = " ".join(window_df['text_clean'].tolist())
+            # ค้นหาคำจากข้อความยาวที่ต่อกันไว้แล้ว
+            match = re.search(pattern, full_text)
+            
+            if match:
+                # ถ้าเจอ ให้ดึงตำแหน่งตัวอักษรเริ่มต้นและสิ้นสุดออกมา
+                start_char_idx = match.start()
+                end_char_idx = match.end() - 1 
                 
-                # เทียบความเหมือนของคำ (ต้องคล้ายกันเกิน 82% เพื่อป้องกันการจับมั่ว)
-                ratio = similar(term, window_text)
-                if ratio > best_match_ratio:
-                    best_match_ratio = ratio
-                    # คำนวณกรอบ Bounding Box คลุมทั้งกลุ่มคำ
-                    min_x = window_df['left'].min()
-                    min_y = window_df['top'].min()
-                    max_x = (window_df['left'] + window_df['width']).max()
-                    max_y = (window_df['top'] + window_df['height']).max()
+                # ป้องกัน Index ทะลุ
+                end_char_idx = min(end_char_idx, len(char_to_word_idx) - 1)
+                
+                # โยงตำแหน่งตัวอักษร กลับไปหาพิกัดกรอบ (Bounding Box) ใน DataFrame
+                start_word_idx = char_to_word_idx[start_char_idx]
+                end_word_idx = char_to_word_idx[end_char_idx]
+                
+                # ดึงแถวข้อมูลทั้งหมดที่ครอบคลุมคำนี้
+                matched_rows = data.loc[start_word_idx:end_word_idx]
+                
+                if not matched_rows.empty:
+                    # คำนวณกรอบที่ครอบคลุมข้อความทั้งหมด (แม้จะถูกตัดขึ้นบรรทัดใหม่)
+                    min_x = matched_rows['left'].min()
+                    min_y = matched_rows['top'].min()
+                    max_x = (matched_rows['left'] + matched_rows['width']).max()
+                    max_y = (matched_rows['top'] + matched_rows['height']).max()
+                    
                     best_box = (min_x, min_y, max_x - min_x, max_y - min_y)
-        
-        # ถ้าระดับความเหมือนมากกว่า 82% ให้ถือว่าเจอสารนั้นจริง
-        if best_match_ratio >= 0.82 and best_box is not None:
-            # ป้องกันการใส่ข้อมูลซ้ำ
-            existing_ings = [x['Ingredient'].lower() for x in found_ingredients]
-            if ing_name not in existing_ings:
-                found_ingredients.append({
-                    'Ingredient': ing_name.title(),
-                    'Function': row['function'],
-                    'Risk': row['risk_level'],
-                    'box': best_box
-                })
-                
+                    
+                    existing_ings = [x['Ingredient'].lower() for x in found_ingredients]
+                    if ing_name not in existing_ings:
+                        found_ingredients.append({
+                            'Ingredient': ing_name.title(),
+                            'Function': db_row['function'],
+                            'Risk': db_row['risk_level'],
+                            'box': best_box
+                        })
+                # ถ้าเจอแล้ว ให้ข้ามไปหาสารตัวต่อไปเลย ไม่ต้องค้นหาคำพ้องซ้ำ
+                break 
+
     if found_ingredients:
         result_df = pd.DataFrame(found_ingredients)
         result_df = result_df.drop_duplicates(subset=['Ingredient']).reset_index(drop=True)
