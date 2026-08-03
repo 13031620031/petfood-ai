@@ -4,7 +4,8 @@ from PIL import Image, ImageEnhance, ImageDraw
 import pytesseract
 import re
 import difflib
-
+import cv2
+import numpy as np
 # ==========================================
 # 1. ตั้งค่าหน้าเพจ 
 # ==========================================
