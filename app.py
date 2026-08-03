@@ -211,10 +211,13 @@ if img_file is not None:
 
     if result_df.empty:
         st.warning("สแกนพบภาพ แต่ไม่พบสารสำคัญที่ตรงกับฐานข้อมูล แนะนำให้ถ่ายรูปในมุมที่สว่างและชัดเจนขึ้น")
+        
+        st.image(original_image, caption="รูปภาพที่คุณอัปโหลด (ไม่พบสารที่ตรงกับฐานข้อมูล)", use_container_width=True)
+        
     else:
         st.success(f"✅ ตรวจพบวัตถุดิบที่รู้จัก {len(result_df)} ชนิด")
+        
 
-        # 🟢 1. ระบบประมวลผลการแพ้อาหาร (Personalized Alert)
         allergy_alerts = []
         for index, row in result_df.iterrows():
             if row['Ingredient'] in user_allergies:
