@@ -171,7 +171,7 @@ st.markdown("**ระบบสแกนและตรวจจับส่ว�
 st.markdown("---")
 
 # 🟢 ฟีเจอร์ "ว้าว": ให้ผู้ใช้เลือกสิ่งที่สัตว์เลี้ยงแพ้
-st.markdown("### ⚠️ ตั้งค่าสุขภาพสัตว์เลี้ยง (AI Personalization)")
+st.markdown("### ⚠️ ตั้งค่าสุขภาพสัตว์เลี้ยง ")
 user_allergies = st.multiselect(
     "สัตว์เลี้ยงของคุณมีประวัติแพ้วัตถุดิบอะไรบ้าง? (ระบบจะแจ้งเตือนหากสแกนพบ)",
     ["Chicken", "Beef", "Corn", "Wheat", "Soy", "Fish Meal", "Dairy"]
