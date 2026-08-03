@@ -158,7 +158,6 @@ def analyze_ingredients_with_boxes(processed_img, df):
     else:
         return pd.DataFrame(), data
 
-
 # ==========================================
 # 5. หน้าจอหลัก (UI)
 # ==========================================
@@ -210,18 +209,63 @@ if img_file is not None:
     else:
         st.success(f"✅ ตรวจพบวัตถุดิบที่รู้จัก {len(result_df)} ชนิด")
 
-        # 🟢 เพิ่มระบบประมวลผลการแพ้อาหาร (Personalized Alert) ตรงนี้
+        # 🟢 1. ระบบประมวลผลการแพ้อาหาร (Personalized Alert)
         allergy_alerts = []
         for index, row in result_df.iterrows():
             if row['Ingredient'] in user_allergies:
                 allergy_alerts.append(row['Ingredient'])
+                
+                # 🔥 โดนบังคับเปลี่ยนให้เป็น "อันตราย" ทันที
+                result_df.at[index, 'Risk'] = 'Danger' 
+                result_df.at[index, 'Function'] = f"❌ [ระวัง! สัตว์เลี้ยงของคุณแพ้สิ่งนี้] {row['Function']}"
         
         if allergy_alerts:
             st.error(f"🚨 **แจ้งเตือนอันตรายรุนแรง!** ตรวจพบส่วนผสมที่สัตว์เลี้ยงของคุณแพ้: **{', '.join(allergy_alerts)}**")
         elif len(user_allergies) > 0:
             st.success("✨ **ปลอดภัย!** ไม่พบส่วนผสมที่สัตว์เลี้ยงของคุณแพ้ในอาหารถุงนี้")
 
-        st.markdown("### 🔍 คลิกเลือกสารเพื่อดูตำแหน่งไฮไลต์บนรูปภาพ")
+        # 🔥 2. จุดเด่นใหม่: แผงสรุปผลเกรดอาหาร (Nutrition Scorecard Dashboard)
+        st.markdown("---")
+        st.markdown("### 📊 ภาพรวมคุณภาพอาหาร (Nutrition Scorecard)")
+        
+        # คำนวณสถิติ
+        safe_count = len(result_df[result_df['Risk'] == 'Safe'])
+        warn_count = len(result_df[result_df['Risk'] == 'Warning'])
+        danger_count = len(result_df[result_df['Risk'] == 'Danger'])
+        total_count = len(result_df)
+        
+        # อัลกอริทึมตัดเกรดคุณภาพอาหาร
+        if danger_count >= 1:
+            grade_text = "เกรด D (ไม่แนะนำ / มีสารอันตราย)"
+            grade_color = "#ff4b4b" # สีแดง
+        elif warn_count >= 2:
+            grade_text = "เกรด C (พอใช้ / มีสารต้องเฝ้าระวังเยอะ)"
+            grade_color = "#ffa421" # สีส้ม
+        elif warn_count == 1:
+            grade_text = "เกรด B (ดี / มีสารเติมแต่งเล็กน้อย)"
+            grade_color = "#faca2b" # สีเหลือง
+        else:
+            grade_text = "เกรด A (ดีเยี่ยม / ปลอดภัยไร้สารเคมีตกค้าง)"
+            grade_color = "#09ab3b" # สีเขียว
+
+        # แสดงกล่องสรุปเกรดแถบสี
+        st.markdown(f"""
+        <div style="background-color: {grade_color}; padding: 15px; border-radius: 12px; color: white; text-align: center; margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <h3 style="color: white; margin: 0;">สรุปผลประเมิน: <b>{grade_text}</b></h3>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # แสดงตัวเลขสถิติแบบ Dashboard
+        col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+        col_m1.metric("🔍 ตรวจพบทั้งหมด", f"{total_count} ชนิด")
+        col_m2.metric("🟢 ปลอดภัย", f"{safe_count} ชนิด")
+        col_m3.metric("🟡 เฝ้าระวัง", f"{warn_count} ชนิด")
+        col_m4.metric("🔴 อันตราย", f"{danger_count} ชนิด")
+        
+        st.markdown("---")
+
+        # 🟢 3. ระบบโชว์รูปภาพและกรอบ Bounding Box (ของเดิม)
+        st.markdown("### 🎯 คลิกเลือกสารเพื่อดูตำแหน่งไฮไลต์บนรูปภาพ")
         
         selected_ingredient = st.selectbox(
             "เลือกสารที่ต้องการตรวจสอบตำแหน่ง:",
@@ -248,23 +292,23 @@ if img_file is not None:
             st.caption("🔴 กรอบสีแดงบนรูปภาพคือตำแหน่งที่ AI ตรวจพบวัตถุดิบตัวนี้ครับ")
 
         with col_res:
-            st.markdown("### 📋 ผลการวิเคราะห์แยกตามระดับความเสี่ยง")
+            st.markdown("### 📋 รายละเอียดแยกตามระดับความเสี่ยง")
             
             safe_df = result_df[result_df['Risk'] == 'Safe']
             warn_df = result_df[result_df['Risk'] == 'Warning']
             danger_df = result_df[result_df['Risk'] == 'Danger']
             
-            with st.expander(f"🟢 ปลอดภัย ({len(safe_df)} ชนิด)", expanded=True):
+            with st.expander(f"🟢 หมวดปลอดภัย ({len(safe_df)} ชนิด)", expanded=True):
                 for _, row in safe_df.iterrows():
                     highlight_mark = " 👉 (กำลังแสดงตำแหน่ง)" if row['Ingredient'] == selected_ingredient else ""
                     st.write(f"- **{row['Ingredient']}**{highlight_mark}<br><small>{row['Function']}</small>", unsafe_allow_html=True)
                     
-            with st.expander(f"🟡 เฝ้าระวัง ({len(warn_df)} ชนิด)", expanded=True):
+            with st.expander(f"🟡 หมวดเฝ้าระวัง ({len(warn_df)} ชนิด)", expanded=True):
                 for _, row in warn_df.iterrows():
                     highlight_mark = " 👉 (กำลังแสดงตำแหน่ง)" if row['Ingredient'] == selected_ingredient else ""
                     st.write(f"- **{row['Ingredient']}**{highlight_mark}<br><small>{row['Function']}</small>", unsafe_allow_html=True)
                     
-            with st.expander(f"🔴 อันตราย ({len(danger_df)} ชนิด)", expanded=True):
+            with st.expander(f"🔴 หมวดอันตราย ({len(danger_df)} ชนิด)", expanded=True):
                 for _, row in danger_df.iterrows():
                     highlight_mark = " 👉 (กำลังแสดงตำแหน่ง)" if row['Ingredient'] == selected_ingredient else ""
                     st.write(f"- **{row['Ingredient']}**{highlight_mark}<br><small>{row['Function']}</small>", unsafe_allow_html=True)
