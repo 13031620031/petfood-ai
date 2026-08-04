@@ -6,6 +6,7 @@ import re
 import difflib
 import cv2
 import numpy as np
+
 # ==========================================
 # 1. ตั้งค่าหน้าเพจ 
 # ==========================================
@@ -71,7 +72,41 @@ def load_data():
 df_db = load_data()
 
 # ==========================================
-# 4. ฟังก์ชันวิเคราะห์ส่วนผสม (ระดับ Pro - Spatial Mapping + Regex)
+# 4. ฟังก์ชันหมุนภาพให้ตรงอัตโนมัติ (Auto-Deskewing)
+# ==========================================
+def auto_deskew(image):
+    # แปลงรูปจาก PIL เป็น OpenCV
+    img_cv = np.array(image.convert('RGB'))
+    gray = cv2.cvtColor(img_cv, cv2.COLOR_RGB2GRAY)
+    
+    # ค้นหาเส้นขอบในภาพ
+    edges = cv2.Canny(gray, 50, 150, apertureSize=3)
+    lines = cv2.HoughLinesP(edges, 1, np.pi/180, 100, minLineLength=100, maxLineGap=10)
+    
+    angle = 0.0
+    if lines is not None:
+        angles = []
+        for line in lines:
+            x1, y1, x2, y2 = line[0]
+            angles.append(np.degrees(np.arctan2(y2 - y1, x2 - x1)))
+        
+        # หาค่าเฉลี่ยองศา (กรองเฉพาะที่เอียงไม่เกิน 45 องศา)
+        valid_angles = [a for a in angles if -45 < a < 45]
+        if valid_angles:
+            angle = np.median(valid_angles)
+            
+    # หมุนภาพกลับให้ตั้งฉาก
+    if angle != 0.0:
+        (h, w) = img_cv.shape[:2]
+        center = (w // 2, h // 2)
+        M = cv2.getRotationMatrix2D(center, angle, 1.0)
+        rotated = cv2.warpAffine(img_cv, M, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+        return Image.fromarray(rotated)
+    
+    return image # ถ้าภาพตรงอยู่แล้ว คืนค่ารูปเดิม
+
+# ==========================================
+# 5. ฟังก์ชันวิเคราะห์ส่วนผสม (ระดับ Pro - Spatial Mapping + Regex)
 # ==========================================
 def analyze_ingredients_with_boxes(processed_img, df):
     data = pytesseract.image_to_data(processed_img, output_type=pytesseract.Output.DATAFRAME)
@@ -115,7 +150,6 @@ def analyze_ingredients_with_boxes(processed_img, df):
             # -------------------------------------------------------------
             # เทคนิคที่ 2: Flexible Regex Matching (ค้นหาแบบยืดหยุ่น)
             # -------------------------------------------------------------
-            # แปลงคำค้นหาให้ยืดหยุ่น เช่น "chicken meal" จะเจอทั้ง "chicken meal", "chicken-meal", "chicken, meal"
             escaped_words = [re.escape(w) for w in term.split()]
             pattern = r'[\s\W]*'.join(escaped_words) 
             
@@ -165,7 +199,7 @@ def analyze_ingredients_with_boxes(processed_img, df):
         return pd.DataFrame(), data
 
 # ==========================================
-# 5. หน้าจอหลัก (UI)
+# 6. หน้าจอหลัก (UI)
 # ==========================================
 col_icon, col_title = st.columns([1, 9])
 with col_icon:
@@ -199,8 +233,11 @@ img_file = camera_file if camera_file is not None else uploaded_file
 if img_file is not None:
     original_image = Image.open(img_file)
     
-    with st.spinner('🤖 AI กำลังอ่านข้อความและประมวลผลตำแหน่งพิกัด...'):
+    with st.spinner('🤖 AI กำลังปรับระนาบภาพและประมวลผลตำแหน่งพิกัด...'):
         try:
+            # 🟢 ปรับระนาบภาพที่เอียงให้ตรงอัตโนมัติก่อนส่งให้ AI
+            original_image = auto_deskew(original_image)
+            
             gray_img = original_image.convert('L')
             enhancer_contrast = ImageEnhance.Contrast(gray_img)
             processed_img = enhancer_contrast.enhance(1.5)
@@ -218,7 +255,6 @@ if img_file is not None:
     else:
         st.success(f"✅ ตรวจพบวัตถุดิบที่รู้จัก {len(result_df)} ชนิด")
         
-
         allergy_alerts = []
         for index, row in result_df.iterrows():
             if row['Ingredient'] in user_allergies:
@@ -273,7 +309,7 @@ if img_file is not None:
         
         st.markdown("---")
 
-        # 🟢 3. ระบบโชว์รูปภาพและกรอบ Bounding Box (ของเดิม)
+        # 🟢 3. ระบบโชว์รูปภาพและกรอบ Bounding Box
         st.markdown("### 🎯 คลิกเลือกสารเพื่อดูตำแหน่งไฮไลต์บนรูปภาพ")
         
         selected_ingredient = st.selectbox(
