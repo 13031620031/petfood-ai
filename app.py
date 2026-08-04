@@ -87,7 +87,8 @@ def auto_deskew(image):
     if lines is not None:
         angles = []
         for line in lines:
-            x1, y1, x2, y2 = line[0]
+            # 🔥 แก้ไขบรรทัดนี้: ใช้ .flatten() เพื่อให้รองรับ OpenCV ทั้งเวอร์ชันเก่าและใหม่
+            x1, y1, x2, y2 = line.flatten()[:4]
             angles.append(np.degrees(np.arctan2(y2 - y1, x2 - x1)))
         
         # หาค่าเฉลี่ยองศา (กรองเฉพาะที่เอียงไม่เกิน 45 องศา)
